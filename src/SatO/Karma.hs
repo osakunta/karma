@@ -14,10 +14,9 @@ module SatO.Karma (
     ) where
 
 import Control.Exception      (Exception)
-import Control.Monad          (void)
+import Control.Monad          (void, forM_)
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.FileEmbed         (embedStringFile)
-import Data.Foldable          (traverse_)
 import Data.Maybe             (fromMaybe)
 import Data.Pool              (Pool, createPool, withResource)
 import Data.Text              (Text)
@@ -146,13 +145,13 @@ instance ToHtml IndexPage where
             div_ [class_ "row"] $ do
                 div_ [class_ "large-3 columns"] $
                     label_ [class_ "text-right middle", for_ "what"] $ "Mitä?"
-                div_ [class_ "large-9 columns"] $ flip traverse_ [minBound..maxBound] $ \e ->
+                div_ [class_ "large-9 columns"] $ forM_ [minBound..maxBound] $ \e ->
                     label_ $ do
                         input_ [type_ "radio", name_ "what", value_ $ actionEnumToText e]
                         span_ $ toHtmlRaw $ actionEnumToHuman e
 
             -- Submit
-            div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $ do
+            div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $
                 input_ [class_ "medium success button", type_ "submit", value_ "Lähetä"]
 
         hr_ []
@@ -168,7 +167,7 @@ instance ToHtml IndexPage where
                 th_ "Kuka"
                 th_ "Mitä"
                 th_ "Koska"
-            flip traverse_ as $ \(Action member enum stamp) -> tr_ $ do
+            forM_ (take 50 as) $ \(Action member enum stamp) -> tr_ $ do
                 td_ $ toHtml member
                 td_ $ toHtml $ actionEnumToHuman enum
                 td_ $ toHtml $ show stamp
@@ -184,7 +183,7 @@ indexPage (Ctx pool actionUrl) = withResource pool $ \conn -> do
 
 submitPage :: Ctx -> InsertAction -> IO IndexPage
 submitPage ctx@(Ctx pool _) ia = do
-    withResource pool $ \conn -> do
+    withResource pool $ \conn ->
         void $ Postgres.execute conn "INSERT INTO karma (member, action) VALUES (?, ?)" ia
     indexPage ctx
 
