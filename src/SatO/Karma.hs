@@ -13,33 +13,33 @@ module SatO.Karma (
     Action,
     ) where
 
+import Control.Exception      (Exception)
+import Control.Monad          (void)
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.FileEmbed         (embedStringFile)
-import Control.Monad (void)
+import Data.Foldable          (traverse_)
 import Data.Maybe             (fromMaybe)
+import Data.Pool              (Pool, createPool, withResource)
 import Data.Text              (Text)
-import Data.Pool (Pool, createPool, withResource)
+import Data.Time              (UTCTime)
+import Data.Typeable          (Typeable)
 import Lucid
 import Network.Wai
-import Data.Typeable (Typeable)
 import Servant
-import Data.Time (UTCTime)
-import Data.Foldable (traverse_)
 import Servant.HTML.Lucid
-import Control.Exception (Exception)
 import System.Environment     (lookupEnv)
 import System.IO              (hPutStrLn, stderr)
 import Text.Read              (readMaybe)
 
 import Database.PostgreSQL.Simple.URL (parseDatabaseUrl)
 
-import qualified Data.Text                as T
-import qualified Network.Wai.Handler.Warp as Warp
-import qualified Database.PostgreSQL.Simple as Postgres
-import qualified Database.PostgreSQL.Simple.FromRow as Postgres
+import qualified Data.Text                            as T
+import qualified Database.PostgreSQL.Simple           as Postgres
 import qualified Database.PostgreSQL.Simple.FromField as Postgres
-import qualified Database.PostgreSQL.Simple.ToField as Postgres
-import qualified Database.PostgreSQL.Simple.ToRow as Postgres
+import qualified Database.PostgreSQL.Simple.FromRow   as Postgres
+import qualified Database.PostgreSQL.Simple.ToField   as Postgres
+import qualified Database.PostgreSQL.Simple.ToRow     as Postgres
+import qualified Network.Wai.Handler.Warp             as Warp
 
 data ActionEnum
     = DishwasherIn
@@ -112,7 +112,7 @@ instance FromFormUrlEncoded InsertAction where
             what <- actionEnumFromText whatText
             pure $ InsertAction who what
 
-type ActionUrl = Text 
+type ActionUrl = Text
 
 data IndexPage = IndexPage
     { _indexPageActionUrl :: !ActionUrl
@@ -136,22 +136,32 @@ instance ToHtml IndexPage where
     toHtml (IndexPage actionUrl as) = page_ "SatO Karma" $ do
         form_ [action_ $ actionUrl, method_ "POST"] $ do
             -- Kuka
-            div_ [class_ "large-4 columns"] $
-                label_ [class_ "text-right middle", for_ "who"] $ "Kuka?"
-            div_ [class_ "large-8 columns"] $
-                input_ [type_ "text", name_  "who" ]
+            div_ [class_ "row"] $ do
+                div_ [class_ "large-3 columns"] $
+                    label_ [class_ "text-right middle", for_ "who"] $ "Kuka?"
+                div_ [class_ "large-9 columns"] $
+                    input_ [type_ "text", name_  "who" ]
 
             -- Mitä?
-            div_ [class_ "large-4 columns"] $
-                label_ [class_ "text-right middle", for_ "what"] $ "Mitä?"
-            div_ [class_ "large-8 columns"] $ flip traverse_ [minBound..maxBound] $ \e ->
-                label_ $ do
-                    input_ [type_ "radio", name_ "what", value_ $ actionEnumToText e]
-                    toHtmlRaw $ actionEnumToHuman e
+            div_ [class_ "row"] $ do
+                div_ [class_ "large-3 columns"] $
+                    label_ [class_ "text-right middle", for_ "what"] $ "Mitä?"
+                div_ [class_ "large-9 columns"] $ flip traverse_ [minBound..maxBound] $ \e ->
+                    label_ $ do
+                        input_ [type_ "radio", name_ "what", value_ $ actionEnumToText e]
+                        span_ $ toHtmlRaw $ actionEnumToHuman e
 
             -- Submit
             div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $ do
                 input_ [class_ "medium success button", type_ "submit", value_ "Lähetä"]
+
+        hr_ []
+
+        div_ [class_ "row"] $
+            div_ [class_ "large-12 columns"] $
+                span_ $ "Statsit tulee sit kun on mistä tehdä statsit"
+
+        hr_ []
 
         table_ $ do
             tr_ $ do
