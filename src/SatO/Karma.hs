@@ -107,7 +107,8 @@ instance Postgres.ToRow InsertAction where
 instance FromFormUrlEncoded InsertAction where
     fromFormUrlEncoded inputs =
         maybe (Left "Cannot parse InsertAction") Right $ do
-            who  <- lookup "who" inputs
+            who'  <- lookup "who" inputs
+            let who = if T.null who' then "joku muu" else who'
             whatText <- lookup "what" inputs
             what <- actionEnumFromText whatText
             pure $ InsertAction who what
