@@ -1,0 +1,6 @@
+h1 { font-size: 22pt; }
+h2 { font-size: 20pt; }
+input { font-size: 14pt; }
+
+.error input[type="text"] { border-color: #c00; }
+.error label { color: #c00;  }

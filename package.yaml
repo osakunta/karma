@@ -1,0 +1,60 @@
+name: karma
+version: 0.1.0.0
+synopsis: Collect karma points
+description: Jee jee 
+author: Oleg Grenrus <oleg.grenrus@iki.fi>
+maintainer: Oleg Grenrus <oleg.grenrus@iki.fi>
+license: BSD3
+github: osakunta/karma
+category: Web
+tested-with: GHC==7.10.3
+extra-source-files:
+- README.md
+
+ghc-options: -Wall
+
+library:
+  source-dirs: src
+  dependencies:
+    - base                  >=4.7   && <4.9
+    - aeson                 >=0.8   && <0.11
+    - aeson-compat
+    - base-compat
+    - bifunctors
+    - blaze-html
+    - bytestring
+    - containers
+    - either
+    - file-embed
+    - http-client
+    - http-client-tls
+    - lens
+    - lucid
+    - markdown
+    - mtl
+    - pretty
+    - semigroups
+    - postgresql-simple
+    - postgresql-simple-url
+    - resource-pool
+    - servant
+    - servant-lucid
+    - servant-server
+    - stm
+    - tagged
+    - text
+    - time
+    - transformers
+    - unordered-containers
+    - vector
+    - wai
+    - warp
+
+executables:
+  karma-server:
+    ghc-options: -threaded
+    main: Main.hs
+    source-dirs: srv
+    dependencies:
+      - base
+      - karma
