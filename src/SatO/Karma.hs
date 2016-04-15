@@ -139,38 +139,41 @@ karmaApi = Proxy
 instance ToHtml IndexPage where
     toHtmlRaw _ = pure ()
     toHtml (IndexPage actionUrl tz as) = page_ "SatO Karma" $ do
+        div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $
+            h1_ "SatO Karma"
+
         form_ [action_ $ actionUrl, method_ "POST"] $ do
             -- Kuka
             div_ [class_ "row"] $ do
-                div_ [class_ "large-3 columns"] $
+                div_ [class_ "large-1 columns"] $
                     label_ [class_ "text-right middle", for_ "who"] $ "Kuka?"
-                div_ [class_ "large-9 columns"] $
+                div_ [class_ "large-11 columns"] $ do
                     input_ [type_ "text", name_ "who", id_ "who" ]
 
-            div_ [class_ "row" ] $
-                div_ [class_ "large-12 columns"] $
                     forM_ (sortBy (compare `on` T.toLower) $ take 10 $ nub $ _actionMember <$> as) $ \am -> do
                         button_ [class_ "medium button magic-auto-fill", onclick_ "return false;"] $ toHtml am
                         span_ " "
 
             -- Mitä?
             div_ [class_ "row"] $ do
-                div_ [class_ "large-3 columns"] $
+                div_ [class_ "large-1 columns"] $
                     label_ [class_ "text-right middle", for_ "what"] $ "Mitä?"
-                div_ [class_ "large-9 columns"] $ forM_ [minBound..maxBound] $ \e ->
-                    label_ $ do
+                div_ [class_ "large-11 columns"] $ do
+                    forM_ [minBound..maxBound] $ \e -> label_ $ do
                         input_ [type_ "radio", name_ "what", value_ $ actionEnumToText e]
                         span_ $ toHtmlRaw $ actionEnumToHuman e
+                    hr_ []
 
             -- Submit
-            div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $
-                input_ [class_ "medium success button", type_ "submit", value_ "Lähetä"]
+            div_ [class_ "row"] $ do
+                div_ [class_ "large-1 columns"] $ pure ()
+                div_ [class_ "large-11 columns"] $
+                    input_ [class_ "medium success button", type_ "submit", value_ "Lähetä"]
 
         hr_ []
 
-        div_ [class_ "row"] $
-            div_ [class_ "large-12 columns"] $
-                span_ $ "Statsit tulee sit kun on mistä tehdä statsit"
+        div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $
+            span_ $ "Statsit tulee sit kun on mistä tehdä statsit"
 
         hr_ []
 
