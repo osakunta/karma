@@ -17,7 +17,8 @@ import Control.Exception      (Exception)
 import Control.Monad          (forM_, void)
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.FileEmbed         (embedStringFile)
-import Data.List              (nub, sort)
+import Data.Function          (on)
+import Data.List              (nub, sortBy)
 import Data.Maybe             (fromMaybe)
 import Data.Pool              (Pool, createPool, withResource)
 import Data.Text              (Text)
@@ -148,7 +149,7 @@ instance ToHtml IndexPage where
 
             div_ [class_ "row" ] $
                 div_ [class_ "large-12 columns"] $
-                    forM_ (sort $ take 10 $ nub $ _actionMember <$> as) $ \am -> do
+                    forM_ (sortBy (compare `on` T.toLower) $ take 10 $ nub $ _actionMember <$> as) $ \am -> do
                         button_ [class_ "medium button magic-auto-fill", onclick_ "return false;"] $ toHtml am
                         span_ " "
 
