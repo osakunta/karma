@@ -113,11 +113,21 @@ instance FromFormUrlEncoded InsertAction where
             what <- actionEnumFromText whatText
             pure $ InsertAction who what
 
+data Score = Score
+    { _scoreMember :: !Text
+    , _scorePoints :: !Int
+    }
+    deriving (Eq, Ord, Show)
+
+instance Postgres.FromRow Score where
+    fromRow = Score <$> Postgres.field <*> Postgres.field
+
 type ActionUrl = Text
 
 data IndexPage = IndexPage
     { _indexPageActionUrl :: !ActionUrl
     , _indexPageActions   :: ![Action]
+    , _indexPageScore     :: ![Score]
     }
 
 data Ctx = Ctx
@@ -134,7 +144,7 @@ karmaApi = Proxy
 
 instance ToHtml IndexPage where
     toHtmlRaw _ = pure ()
-    toHtml (IndexPage actionUrl as) = page_ "SatO Karma" $ do
+    toHtml (IndexPage actionUrl as ss) = page_ "SatO Karma" $ do
         form_ [action_ $ actionUrl, method_ "POST"] $ do
             -- Kuka
             div_ [class_ "row"] $ do
@@ -164,13 +174,24 @@ instance ToHtml IndexPage where
 
         hr_ []
 
+        div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $ table_ $ do
+            tr_ $ do
+                th_ "Kuka"
+                th_ "Pojoing"
+
+            forM_ (take 50 ss) $ \(Score member points) -> tr_ $ do
+                td_ $ toHtml member
+                td_ $ toHtml $ show points
+
+        hr_ []
+
         div_ [class_ "row"] $
             div_ [class_ "large-12 columns"] $
                 span_ $ "Statsit tulee sit kun on mistä tehdä statsit"
 
         hr_ []
 
-        table_ $ do
+        div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $ table_ $ do
             tr_ $ do
                 th_ "Kuka"
                 th_ "Mitä"
@@ -181,13 +202,14 @@ instance ToHtml IndexPage where
                 td_ $ toHtml $ show stamp
 
 -------------------------------------------------------------------------------
--- Enspoints
+-- Endpoints
 -------------------------------------------------------------------------------
 
 indexPage :: Ctx -> IO IndexPage
 indexPage (Ctx pool actionUrl) = withResource pool $ \conn -> do
     as <- Postgres.query_ conn "SELECT member, action, stamp FROM karma ORDER BY stamp DESC;"
-    pure $ IndexPage actionUrl as
+    ss <- Postgres.query_ conn "select member, round(1000 * sum(exp(-(((extract(epoch from current_timestamp - stamp) :: float) / (7 * 2 * 86400)) ^ 2)))) :: int as points from karma group by member order by points desc;"
+    pure $ IndexPage actionUrl as ss
 
 submitPage :: Ctx -> InsertAction -> IO IndexPage
 submitPage ctx@(Ctx pool _) ia = do
