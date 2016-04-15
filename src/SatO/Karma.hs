@@ -14,14 +14,15 @@ module SatO.Karma (
     ) where
 
 import Control.Exception      (Exception)
-import Control.Monad          (void, forM_)
+import Control.Monad          (forM_, void)
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.FileEmbed         (embedStringFile)
-import Data.Maybe             (fromMaybe)
 import Data.List              (nub, sort)
+import Data.Maybe             (fromMaybe)
 import Data.Pool              (Pool, createPool, withResource)
 import Data.Text              (Text)
 import Data.Time              (UTCTime)
+import Data.Time.Zones        (TZ, loadSystemTZ, utcToLocalTimeTZ)
 import Data.Typeable          (Typeable)
 import Lucid
 import Network.Wai
@@ -117,12 +118,14 @@ type ActionUrl = Text
 
 data IndexPage = IndexPage
     { _indexPageActionUrl :: !ActionUrl
+    , _indexPageTz        :: !TZ
     , _indexPageActions   :: ![Action]
     }
 
 data Ctx = Ctx
     { _ctxPostgresPool :: !(Pool Postgres.Connection)
     , _ctxActionUrl    :: !ActionUrl
+    , _ctxTz           :: !TZ
     }
 
 type KarmaAPI =
@@ -134,7 +137,7 @@ karmaApi = Proxy
 
 instance ToHtml IndexPage where
     toHtmlRaw _ = pure ()
-    toHtml (IndexPage actionUrl as) = page_ "SatO Karma" $ do
+    toHtml (IndexPage actionUrl tz as) = page_ "SatO Karma" $ do
         form_ [action_ $ actionUrl, method_ "POST"] $ do
             -- Kuka
             div_ [class_ "row"] $ do
@@ -178,19 +181,19 @@ instance ToHtml IndexPage where
             forM_ (take 50 as) $ \(Action member enum stamp) -> tr_ $ do
                 td_ $ toHtml member
                 td_ $ toHtml $ actionEnumToHuman enum
-                td_ $ toHtml $ show stamp
+                td_ $ toHtml $ show $ utcToLocalTimeTZ tz stamp
 
 -------------------------------------------------------------------------------
 -- Enspoints
 -------------------------------------------------------------------------------
 
 indexPage :: Ctx -> IO IndexPage
-indexPage (Ctx pool actionUrl) = withResource pool $ \conn -> do
+indexPage (Ctx pool actionUrl tz) = withResource pool $ \conn -> do
     as <- Postgres.query_ conn "SELECT member, action, stamp FROM karma ORDER BY stamp DESC;"
-    pure $ IndexPage actionUrl as
+    pure $ IndexPage actionUrl tz as
 
 submitPage :: Ctx -> InsertAction -> IO IndexPage
-submitPage ctx@(Ctx pool _) ia = do
+submitPage ctx@(Ctx pool _ _) ia = do
     withResource pool $ \conn ->
         void $ Postgres.execute conn "INSERT INTO karma (member, action) VALUES (?, ?)" ia
     indexPage ctx
@@ -236,7 +239,8 @@ defaultMain = do
     actionUrl           <- maybe "/" T.pack
         <$> lookupEnv "KARMA_ACTIONURL"
     pool <- createPool (Postgres.connect postgresConnectInfo) Postgres.close 1 60 5
-    let ctx = Ctx pool actionUrl
+    tz <- loadSystemTZ "Europe/Helsinki"
+    let ctx = Ctx pool actionUrl tz
     hPutStrLn stderr "Hello, karma is alive"
     hPutStrLn stderr "Starting web server"
     Warp.run port (app ctx)

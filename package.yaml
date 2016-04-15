@@ -45,6 +45,7 @@ library:
     - text
     - time
     - transformers
+    - tz
     - unordered-containers
     - vector
     - wai
