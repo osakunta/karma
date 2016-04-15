@@ -18,6 +18,7 @@ import Control.Monad          (void, forM_)
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.FileEmbed         (embedStringFile)
 import Data.Maybe             (fromMaybe)
+import Data.List              (nub, sort)
 import Data.Pool              (Pool, createPool, withResource)
 import Data.Text              (Text)
 import Data.Time              (UTCTime)
@@ -139,7 +140,13 @@ instance ToHtml IndexPage where
                 div_ [class_ "large-3 columns"] $
                     label_ [class_ "text-right middle", for_ "who"] $ "Kuka?"
                 div_ [class_ "large-9 columns"] $
-                    input_ [type_ "text", name_  "who" ]
+                    input_ [type_ "text", name_ "who", id_ "who" ]
+
+            div_ [class_ "row" ] $
+                div_ [class_ "large-12 columns"] $
+                    forM_ (sort $ take 10 $ nub $ _actionMember <$> as) $ \am -> do
+                        button_ [class_ "medium button magic-auto-fill", onclick_ "return false;"] $ toHtml am
+                        span_ " "
 
             -- Mitä?
             div_ [class_ "row"] $ do
@@ -203,6 +210,7 @@ page_ t b = doctypehtml_ $ do
         style_ [type_ "text/css"] ($(embedStringFile "style.css") :: String)
     body_ $ do
         b
+        script_ $(embedStringFile "script.js")
 
 -------------------------------------------------------------------------------
 -- WAI boilerplate
