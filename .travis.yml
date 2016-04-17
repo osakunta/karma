@@ -36,6 +36,9 @@ matrix:
         sources:
         - hvr-ghc
         packages:
+        - libblas-dev
+        - libgsl0-dev
+        - liblapack-dev
         - ghc-7.10.3
         - libgmp-dev
     compiler: ! ': # ghc-7.10.3 stack-lts-5.yaml'
