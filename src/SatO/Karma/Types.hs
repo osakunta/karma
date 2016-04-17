@@ -84,3 +84,9 @@ instance FromFormUrlEncoded InsertAction where
             whatText <- lookup "what" inputs
             what <- actionEnumFromText whatText
             pure $ InsertAction who what
+
+data Graph = Graph
+    { _graphCurr :: !Double
+    , _graphPrev :: [(Double, Double)]
+    , _graphNext :: [(Double, Double)]
+    }

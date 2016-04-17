@@ -22,6 +22,7 @@ import Data.List              (nub, sortBy)
 import Data.Maybe             (fromMaybe)
 import Data.Pool              (Pool, createPool, withResource)
 import Data.Text              (Text)
+import Data.Time              (getCurrentTime)
 import Data.Time.Zones        (TZ, loadSystemTZ, utcToLocalTimeTZ)
 import Lucid
 import Network.Wai
@@ -154,9 +155,15 @@ submitPage ctx@(Ctx pool _ _) ia = do
     indexPage ctx
 
 chartEndpoint :: Ctx -> Text -> IO Chart
-chartEndpoint (Ctx pool _ _) who = withResource pool $ \conn -> do
-    as <- Postgres.query conn "SELECT member, action, stamp FROM karma WHERE member = ? ORDER BY stamp ASC;" (Postgres.Only who) :: IO [Action]
-    pure $ chart $ Map.singleton who $ karmaGraph as
+chartEndpoint (Ctx pool _ _) whos = do
+    now <- getCurrentTime
+    withResource pool $ \conn -> do
+        ps <- traverse (f conn now) (T.split (==',') whos)
+        pure $ chart $ Map.fromList ps
+  where
+    f conn now who = do
+        as <- Postgres.query conn "SELECT member, action, stamp FROM karma WHERE member = ? ORDER BY stamp ASC;" (Postgres.Only who) :: IO [Action]
+        return (who, karmaGraph now as)
 
 -------------------------------------------------------------------------------
 -- HTML stuff
