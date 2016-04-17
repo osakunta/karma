@@ -20,6 +20,14 @@ library:
     - aeson                 >=0.8   && <0.11
     - aeson-compat
     - base-compat
+    - Chart
+    - hmatrix
+    - hmatrix-gsl
+    - Chart-diagrams
+    - diagrams-svg
+    - diagrams-core
+    - diagrams-lib
+    - diagrams-rasterific
     - bifunctors
     - blaze-html
     - bytestring
@@ -28,6 +36,7 @@ library:
     - file-embed
     - http-client
     - http-client-tls
+    - http-media
     - lens
     - lucid
     - markdown

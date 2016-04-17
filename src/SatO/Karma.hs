@@ -1,12 +1,13 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 module SatO.Karma (
     defaultMain,
     -- * Other stuff
@@ -32,10 +33,20 @@ import Text.Read              (readMaybe)
 
 import Database.PostgreSQL.Simple.URL (parseDatabaseUrl)
 
-import qualified Data.Text                            as T
-import qualified Database.PostgreSQL.Simple           as Postgres
-import qualified Network.Wai.Handler.Warp             as Warp
+import qualified Data.Map                   as Map
+import qualified Data.Text                  as T
+import qualified Database.PostgreSQL.Simple as Postgres
+import qualified Network.HTTP.Media         as M
+import qualified Network.Wai.Handler.Warp   as Warp
 
+import System.IO.Unsafe (unsafePerformIO)
+
+import Graphics.Rendering.Chart.Backend.Diagrams
+import Graphics.Rendering.Chart.Backend.Types    (vectorAlignmentFns)
+import Graphics.Rendering.Chart.Renderable       (ToRenderable (..))
+
+import SatO.Karma.Chart
+import SatO.Karma.Graph
 import SatO.Karma.Types
 
 -------------------------------------------------------------------------------
@@ -56,9 +67,22 @@ data Ctx = Ctx
     , _ctxTz           :: !TZ
     }
 
+data SVG
+
+instance Accept SVG where
+   contentType _ = "image" M.// "svg+xml"
+
+instance ToRenderable a => MimeRender SVG a where
+   mimeRender _ x = fst $ renderableToSVGString' (toRenderable x) denv
+
+denv :: DEnv Double
+denv = unsafePerformIO $ defaultEnv vectorAlignmentFns 600 400
+{-# NOINLINE denv #-}
+
 type KarmaAPI =
     Get '[HTML] IndexPage
     :<|> ReqBody '[FormUrlEncoded] InsertAction :> Post '[HTML] IndexPage
+    :<|> "chart" :> Capture "who" Text :> Get '[SVG] Chart
 
 karmaApi :: Proxy KarmaAPI
 karmaApi = Proxy
@@ -129,6 +153,11 @@ submitPage ctx@(Ctx pool _ _) ia = do
         void $ Postgres.execute conn "INSERT INTO karma (member, action) VALUES (?, ?)" ia
     indexPage ctx
 
+chartEndpoint :: Ctx -> Text -> IO Chart
+chartEndpoint (Ctx pool _ _) who = withResource pool $ \conn -> do
+    as <- Postgres.query conn "SELECT member, action, stamp FROM karma WHERE member = ? ORDER BY stamp ASC;" (Postgres.Only who) :: IO [Action]
+    pure $ chart $ Map.singleton who $ karmaGraph as
+
 -------------------------------------------------------------------------------
 -- HTML stuff
 -------------------------------------------------------------------------------
@@ -152,7 +181,9 @@ page_ t b = doctypehtml_ $ do
 -------------------------------------------------------------------------------
 
 server :: Ctx -> Server KarmaAPI
-server ctx = liftIO (indexPage ctx) :<|> liftIO . (submitPage ctx)
+server ctx = liftIO (indexPage ctx)
+    :<|> liftIO . (submitPage ctx)
+    :<|> liftIO . (chartEndpoint ctx)
 
 app :: Ctx -> Application
 app ctx = serve karmaApi (server ctx)
