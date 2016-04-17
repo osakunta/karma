@@ -19,8 +19,8 @@ chart m = Chart $ do
   where
     f n (Graph _ prev next) p = do
         _ <- p
-        plot (line (unpack n) [prev'])
         plot (dline [next])
+        plot (line (unpack n) [prev'])
       where
         prev' = case filter ((> (-30)) . fst) prev of
             []         -> [(-30,0), (0, 0)]
