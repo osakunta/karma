@@ -50,7 +50,10 @@ model :: Double -> [Double] -> [Double]
 model _ = fmap (negate . decay)
 
 decay :: Double -> Double
-decay x = (k1 * exp (negate k2 * x ^ (3 :: Int)) + log (x + 1) - k1) * 1.5
+decay y = d y - d 0
   where
-    k1 = 0.753395
-    k2 = 2.37257
+    d x = k1 * exp (negate $ (4 * x - 2) ^ i2)
+        + k2 * (1 - exp (negate $ x ^ i2 / 4)) ^ i2
+    k1 = 0.4
+    k2 = 0.8
+    i2 = 2 :: Int

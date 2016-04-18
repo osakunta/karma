@@ -18,9 +18,9 @@ chart m = Chart $ do
     foldWithKey f (pure ()) m
   where
     f n (Graph _ prev next) p = do
-        _ <- p
         plot (dline [next])
         plot (line (unpack n) [prev'])
+        p
       where
         prev' = case filter ((> (-30)) . fst) prev of
             []         -> [(-30,0), (0, 0)]
