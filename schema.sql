@@ -5,3 +5,7 @@ create table karma (
 );
 
 create index karma_stamp_idx on karma (stamp);
+
+create sequence karma_seq;
+
+alter table karma add column action_id integer unique not null default nextval('karma_seq');
