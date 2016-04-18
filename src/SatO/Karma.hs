@@ -100,7 +100,7 @@ instance ToHtml IndexPage where
                 div_ [class_ "large-1 columns"] $
                     label_ [class_ "text-right middle", for_ "who"] $ "Kuka?"
                 div_ [class_ "large-11 columns"] $ do
-                    input_ [type_ "text", name_ "who", id_ "who" ]
+                    input_ [type_ "text", name_ "who", placeholder_ "Ei ole pakko täyttää, jätä tyhjäksi niin olet \"joku muu\"", id_ "who" ]
 
                     forM_ (sortBy (compare `on` T.toLower) $ take 10 $ nub $ _actionMember <$> as) $ \am -> do
                         button_ [class_ "medium button magic-auto-fill", onclick_ "return false;"] $ toHtml am
