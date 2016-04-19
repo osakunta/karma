@@ -1,0 +1,6 @@
+default: dev
+envs:
+  dev:
+    PORT: "8080"
+    KARMA_POSTGRES_URL: postgres://$USER@localhost:5432/$USER
+    KARMA_ACTION_URL: /
