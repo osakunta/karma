@@ -2,6 +2,8 @@ module SatO.Karma.Chart (Chart, chart) where
 
 import Data.Map  (Map, foldWithKey)
 import Data.Text (Text, unpack)
+import Data.Colour.CIE
+import Data.Colour.CIE.Illuminant (d65)
 
 import Graphics.Rendering.Chart.Easy
 
@@ -14,14 +16,16 @@ instance ToRenderable Chart where
 
 chart :: Map Text Graph -> Chart
 chart m = Chart $ do
+    setColors . fmap (opaque . mkXYZTriple . (/16)) $ [0,2..14] ++ [1,3..15]
     layout_title .= "SatO Karma"
     foldWithKey f (pure ()) m
   where
-    f n (Graph _ prev next) p = do
+    f n (Graph curr prev next) p = do
         plot (dline [next])
-        plot (line (unpack n) [prev'])
+        plot (line n' [prev'])
         p
       where
+        n' = unpack n ++ " " ++ show (round $ curr * 1000 :: Int)
         prev' = case filter ((> (-30)) . fst) prev of
             []         -> [(-30,0), (0, 0)]
             ((t, _):_)
@@ -40,3 +44,10 @@ currColor :: EC l (AlphaColour Double)
 currColor = liftCState $ do
   (c:_) <- use colors
   return c
+
+mkXYZTriple :: Double -> Colour Double
+mkXYZTriple p = cieLAB d65 l x y
+  where
+    l = 60
+    x = 20 + 70 * cos (2 * pi * p)
+    y = 20 + 70 * sin (2 * pi * p)

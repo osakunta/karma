@@ -24,6 +24,7 @@ library:
     - hmatrix
     - hmatrix-gsl
     - Chart-diagrams
+    - colour
     - diagrams-svg
     - diagrams-core
     - diagrams-lib
