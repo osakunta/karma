@@ -20,9 +20,10 @@ import Data.FileEmbed         (embedStringFile)
 import Data.Function          (on)
 import Data.List              (nub, sortBy)
 import Data.Maybe             (fromMaybe)
+import Data.Monoid            ((<>))
 import Data.Pool              (Pool, createPool, withResource)
 import Data.Text              (Text)
-import Data.Time              (getCurrentTime)
+import Data.Time              (UTCTime, getCurrentTime)
 import Data.Time.Zones        (TZ, loadSystemTZ, utcToLocalTimeTZ)
 import Lucid
 import Network.Wai
@@ -77,12 +78,13 @@ instance ToRenderable a => MimeRender SVG a where
    mimeRender _ x = fst $ renderableToSVGString' (toRenderable x) denv
 
 denv :: DEnv Double
-denv = unsafePerformIO $ defaultEnv vectorAlignmentFns 600 400
+denv = unsafePerformIO $ defaultEnv vectorAlignmentFns 1000 700
 {-# NOINLINE denv #-}
 
 type KarmaAPI =
     Get '[HTML] IndexPage
     :<|> ReqBody '[FormUrlEncoded] InsertAction :> Post '[HTML] IndexPage
+    :<|> "chart" :> Get '[SVG] Chart
     :<|> "chart" :> Capture "who" Text :> Get '[SVG] Chart
 
 karmaApi :: Proxy KarmaAPI
@@ -125,7 +127,7 @@ instance ToHtml IndexPage where
         hr_ []
 
         div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $
-            span_ $ "Statsit tulee sit kun on mistä tehdä statsit"
+            img_ [src_ $ actionUrl <> "chart" ]
 
         hr_ []
 
@@ -135,7 +137,7 @@ instance ToHtml IndexPage where
                 th_ "Mitä"
                 th_ "Koska"
             forM_ (take 50 as) $ \(Action member enum stamp) -> tr_ $ do
-                td_ $ toHtml member
+                td_ $ a_ [href_ $ actionUrl <> "chart/" <> member ] $ toHtml member
                 td_ $ toHtml $ actionEnumToHuman enum
                 td_ $ toHtml $ show $ utcToLocalTimeTZ tz stamp
 
@@ -154,6 +156,22 @@ submitPage ctx@(Ctx pool _ _) ia = do
         void $ Postgres.execute conn "INSERT INTO karma (member, action) VALUES (?, ?)" ia
     indexPage ctx
 
+allChartEndpoint :: Ctx -> IO Chart
+allChartEndpoint (Ctx pool _ _) = do
+    now <- getCurrentTime
+    withResource pool $ \conn -> do
+        ps <- f conn now
+        pure $ chart ps
+  where
+    f :: Postgres.Connection -> UTCTime -> IO (Map.Map Text Graph)
+    f conn now = do
+        as <- Postgres.query_ conn "SELECT member, action, stamp FROM karma ORDER BY stamp ASC;"
+        pure
+            . fmap (karmaGraph now . sortBy (compare `on` _actionStamp))
+            . Map.fromListWith (++)
+            . map (\a -> (_actionMember a, [a]))
+            $ as
+
 chartEndpoint :: Ctx -> Text -> IO Chart
 chartEndpoint (Ctx pool _ _) whos = do
     now <- getCurrentTime
@@ -161,8 +179,9 @@ chartEndpoint (Ctx pool _ _) whos = do
         ps <- traverse (f conn now) (T.split (==',') whos)
         pure $ chart $ Map.fromList ps
   where
+    f :: Postgres.Connection -> UTCTime -> Text -> IO (Text, Graph)
     f conn now who = do
-        as <- Postgres.query conn "SELECT member, action, stamp FROM karma WHERE member = ? ORDER BY stamp ASC;" (Postgres.Only who) :: IO [Action]
+        as <- Postgres.query conn "SELECT member, action, stamp FROM karma WHERE member = ? ORDER BY stamp ASC;" (Postgres.Only who)
         return (who, karmaGraph now as)
 
 -------------------------------------------------------------------------------
@@ -190,6 +209,7 @@ page_ t b = doctypehtml_ $ do
 server :: Ctx -> Server KarmaAPI
 server ctx = liftIO (indexPage ctx)
     :<|> liftIO . (submitPage ctx)
+    :<|> liftIO (allChartEndpoint ctx)
     :<|> liftIO . (chartEndpoint ctx)
 
 app :: Ctx -> Application
