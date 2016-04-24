@@ -14,6 +14,8 @@ module SatO.Karma (
     Action,
     ) where
 
+import Control.AutoUpdate     (defaultUpdateSettings, mkAutoUpdate,
+                               updateAction, updateFreq)
 import Control.Monad          (forM_, void)
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.FileEmbed         (embedStringFile)
@@ -67,6 +69,7 @@ data Ctx = Ctx
     { _ctxPostgresPool :: !(Pool Postgres.Connection)
     , _ctxActionUrl    :: !ActionUrl
     , _ctxTz           :: !TZ
+    , _ctxAllGraph     :: !(IO Chart)
     }
 
 data SVG
@@ -126,8 +129,10 @@ instance ToHtml IndexPage where
 
         hr_ []
 
-        div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $
+        div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $ do
             img_ [src_ $ actionUrl <> "chart" ]
+            br_ []
+            span_ $ small_ "Päivittyy noin minuutin välein"
 
         hr_ []
 
@@ -146,18 +151,21 @@ instance ToHtml IndexPage where
 -------------------------------------------------------------------------------
 
 indexPage :: Ctx -> IO IndexPage
-indexPage (Ctx pool actionUrl tz) = withResource pool $ \conn -> do
+indexPage (Ctx pool actionUrl tz _) = withResource pool $ \conn -> do
     as <- Postgres.query_ conn "SELECT member, action, stamp FROM karma ORDER BY stamp DESC;"
     pure $ IndexPage actionUrl tz as
 
 submitPage :: Ctx -> InsertAction -> IO IndexPage
-submitPage ctx@(Ctx pool _ _) ia = do
+submitPage ctx@(Ctx pool _ _ _) ia = do
     withResource pool $ \conn ->
         void $ Postgres.execute conn "INSERT INTO karma (member, action) VALUES (?, ?)" ia
     indexPage ctx
 
 allChartEndpoint :: Ctx -> IO Chart
-allChartEndpoint (Ctx pool _ _) = do
+allChartEndpoint (Ctx _ _ _ action) = action
+
+allChart :: Pool Postgres.Connection -> IO Chart
+allChart pool = do
     now <- getCurrentTime
     withResource pool $ \conn -> do
         ps <- f conn now
@@ -173,7 +181,7 @@ allChartEndpoint (Ctx pool _ _) = do
             $ as
 
 chartEndpoint :: Ctx -> Text -> IO Chart
-chartEndpoint (Ctx pool _ _) whos = do
+chartEndpoint (Ctx pool _ _ _) whos = do
     now <- getCurrentTime
     withResource pool $ \conn -> do
         ps <- traverse (f conn now) (T.split (==',') whos)
@@ -229,7 +237,12 @@ defaultMain = do
         <$> lookupEnv "KARMA_ACTIONURL"
     pool <- createPool (Postgres.connect postgresConnectInfo) Postgres.close 1 60 5
     tz <- loadSystemTZ "Europe/Helsinki"
-    let ctx = Ctx pool actionUrl tz
+    chartAction <- mkAutoUpdate $ defaultUpdateSettings
+        { updateAction = allChart pool
+        , updateFreq   = 60 * 1000000  -- One minute
+        }
+
+    let ctx = Ctx pool actionUrl tz chartAction:: Ctx
     hPutStrLn stderr "Hello, karma is alive"
     hPutStrLn stderr "Starting web server"
     Warp.run port (app ctx)
