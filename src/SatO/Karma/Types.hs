@@ -2,6 +2,7 @@
 module SatO.Karma.Types where
 
 import Control.Exception (Exception)
+import Data.Aeson        (FromJSON (..), withObject, withText, (.:))
 import Data.Text         (Text)
 import Data.Time         (UTCTime)
 import Data.Typeable     (Typeable)
@@ -52,6 +53,11 @@ instance Postgres.FromField ActionEnum where
 instance Postgres.ToField ActionEnum where
     toField = Postgres.toField . actionEnumToText
 
+instance FromJSON ActionEnum where
+    parseJSON = withText "ActionEnum" $ \t ->
+        maybe (fail $ "Invalid action " ++ T.unpack t) pure $
+            actionEnumFromText t
+
 newtype ActionEnumConversionError = ActionEnumConversionError Text
     deriving (Show, Typeable)
 
@@ -79,11 +85,20 @@ instance Postgres.ToRow InsertAction where
 instance FromFormUrlEncoded InsertAction where
     fromFormUrlEncoded inputs =
         maybe (Left "Cannot parse InsertAction") Right $ do
-            who'  <- lookup "who" inputs
-            let who = if T.null who' then "joku muu" else who'
+            who  <- lookup "who" inputs
             whatText <- lookup "what" inputs
             what <- actionEnumFromText whatText
-            pure $ InsertAction who what
+            pure $ insertAction who what
+
+insertAction :: Text -> ActionEnum -> InsertAction
+insertAction who
+   | T.null who = InsertAction "joku muu"
+   | otherwise  = InsertAction who
+
+instance FromJSON InsertAction where
+    parseJSON = withObject "InsertAction" $ \obj -> insertAction
+        <$> obj .: "member"
+        <*> obj .: "action"
 
 data Graph = Graph
     { _graphCurr :: !Double

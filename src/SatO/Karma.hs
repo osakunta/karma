@@ -18,6 +18,7 @@ import Control.AutoUpdate     (defaultUpdateSettings, mkAutoUpdate,
                                updateAction, updateFreq)
 import Control.Monad          (forM_, void)
 import Control.Monad.IO.Class (MonadIO (..))
+import Data.Aeson             (ToJSON (..), object, (.=))
 import Data.FileEmbed         (embedStringFile)
 import Data.Function          (on)
 import Data.List              (nub, sortBy)
@@ -72,6 +73,11 @@ data Ctx = Ctx
     , _ctxAllGraph     :: !(IO Chart)
     }
 
+data PostResponse = PostResponse
+
+instance ToJSON PostResponse where
+    toJSON _ = object [ "status" .= ("ok" :: Text) ]
+
 data SVG
 
 instance Accept SVG where
@@ -87,6 +93,7 @@ denv = unsafePerformIO $ defaultEnv vectorAlignmentFns 1000 700
 type KarmaAPI =
     Get '[HTML] IndexPage
     :<|> ReqBody '[FormUrlEncoded] InsertAction :> Post '[HTML] IndexPage
+    :<|> "ajax" :> ReqBody '[JSON] InsertAction :> Post '[JSON] PostResponse
     :<|> "chart" :> Get '[SVG] Chart
     :<|> "chart" :> Capture "who" Text :> Get '[SVG] Chart
 
@@ -161,6 +168,12 @@ submitPage ctx@(Ctx pool _ _ _) ia = do
         void $ Postgres.execute conn "INSERT INTO karma (member, action) VALUES (?, ?)" ia
     indexPage ctx
 
+submitAjax :: Ctx -> InsertAction -> IO PostResponse
+submitAjax (Ctx pool _ _ _) ia = do
+    withResource pool $ \conn ->
+        void $ Postgres.execute conn "INSERT INTO karma (member, action) VALUES (?, ?)" ia
+    pure PostResponse
+
 allChartEndpoint :: Ctx -> IO Chart
 allChartEndpoint (Ctx _ _ _ action) = action
 
@@ -217,6 +230,7 @@ page_ t b = doctypehtml_ $ do
 server :: Ctx -> Server KarmaAPI
 server ctx = liftIO (indexPage ctx)
     :<|> liftIO . (submitPage ctx)
+    :<|> liftIO . (submitAjax ctx)
     :<|> liftIO (allChartEndpoint ctx)
     :<|> liftIO . (chartEndpoint ctx)
 
