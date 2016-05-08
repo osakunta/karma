@@ -26,7 +26,9 @@ import Data.Maybe             (fromMaybe)
 import Data.Monoid            ((<>))
 import Data.Pool              (Pool, createPool, withResource)
 import Data.Text              (Text)
-import Data.Time              (UTCTime, diffUTCTime, getCurrentTime)
+import Data.Time              (UTCTime, defaultTimeLocale, diffUTCTime,
+                               formatTime, getCurrentTime)
+import Data.Time.Format.Human (humanReadableTimeI18N', HumanTimeLocale (..), defaultHumanTimeLocale)
 import Data.Time.Zones        (TZ, loadSystemTZ, utcToLocalTimeTZ)
 import Lucid
 import Network.Wai
@@ -164,12 +166,31 @@ actionTableToHtml actionUrl tz now as =
             tr_ [class_ $ actionEnumToText enum <> " " <> cls stamp ] $ do
                 td_ $ a_ [href_ $ actionUrl <> "chart/" <> member ] $ toHtml member
                 td_ $ toHtml $ actionEnumToHuman enum
-                td_ $ toHtml $ show $ utcToLocalTimeTZ tz stamp
+                td_ $ toHtml $ humanTime now tz stamp
   where
     cls stamp | d < 45 * 60       = "recent"
               | d > 20 * 60 * 60  = "very-old"
               | otherwise         = "old"
       where d = now `diffUTCTime` stamp
+
+-------------------------------------------------------------------------------
+-- Human Finissh time
+-------------------------------------------------------------------------------
+
+humanTime :: UTCTime -> TZ -> UTCTime -> String
+humanTime now tz stamp
+    | d < 5 * 60 * 60   = humanReadableTimeI18N' loc now stamp
+    | otherwise         = formatTime defaultTimeLocale "%c" $ utcToLocalTimeTZ tz stamp
+  where
+    d   = now `diffUTCTime` stamp
+    loc = defaultHumanTimeLocale
+        { justNow = "juur äskö"
+        , secondsAgo = \_ i -> i <> " sekunttia sitte"
+        , oneMinuteAgo = \_ -> "minuutti sitte"
+        , minutesAgo = \_ i -> i <> " minuuttia sitte"
+        , oneHourAgo = \_ -> "tunti sitte"
+        , aboutHoursAgo = \_ i -> i <> " tuntia sitte"
+        }
 
 -------------------------------------------------------------------------------
 -- Enspoints

@@ -4,12 +4,13 @@ packages:
 extra-deps:
 - aeson-0.11.2.0
 - aeson-compat-0.3.3.0
-- servant-0.7
-- servant-server-0.7
-- servant-lucid-0.7
 - Chart-1.6
 - Chart-diagrams-1.6
+- friendly-time-0.4
+- OneTuple-0.2.1
+- servant-0.7
+- servant-lucid-0.7
+- servant-server-0.7
 - SVGFonts-1.5.0.0
 - tuple-0.3.0.2
-- OneTuple-0.2.1
 flags: {}

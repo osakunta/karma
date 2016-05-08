@@ -49,6 +49,7 @@ library
     , containers
     , either
     , file-embed
+    , friendly-time
     , http-client
     , http-client-tls
     , http-media
