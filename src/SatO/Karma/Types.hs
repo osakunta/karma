@@ -23,6 +23,7 @@ data ActionEnum
     | Dishes
     | TablesPori
     | TablesRauma
+    | Trash
     deriving (Eq, Ord, Enum, Bounded, Show)
 
 actionEnumFromText :: Text -> Maybe ActionEnum
@@ -38,6 +39,7 @@ actionEnumToText Kitchen       = "kitchen"
 actionEnumToText Dishes        = "dishes"
 actionEnumToText TablesPori    = "tables-pori"
 actionEnumToText TablesRauma   = "tables-rauma"
+actionEnumToText Trash         = "trash"
 
 actionEnumToHuman :: ActionEnum -> Text
 actionEnumToHuman Coffee        = "Keitti kahvit"
@@ -47,6 +49,17 @@ actionEnumToHuman Kitchen       = "Siivosi keittiön"
 actionEnumToHuman Dishes        = "Tiskasi"
 actionEnumToHuman TablesPori    = "Siivosi porin pöydät"
 actionEnumToHuman TablesRauma   = "Siivosi rauman pöydät"
+actionEnumToHuman Trash         = "Vei roskat"
+
+actionEnumToHuman2 :: ActionEnum -> Maybe Text
+actionEnumToHuman2 Coffee        = Nothing
+actionEnumToHuman2 DishwasherIn  = Nothing
+actionEnumToHuman2 DishwasherOut = Just "ja pisti jäljellä olleet tiskit koneeseen"
+actionEnumToHuman2 Kitchen       = Nothing
+actionEnumToHuman2 Dishes        = Just "(pannut, kattilat, veitset, puulastat, ja muut asiat joita ei laiteta tiskikoneeseen)"
+actionEnumToHuman2 TablesPori    = Nothing
+actionEnumToHuman2 TablesRauma   = Nothing
+actionEnumToHuman2 Trash         = Just "(bio, energia ja seka)"
 
 instance Postgres.FromField ActionEnum where
     fromField f mdata = Postgres.fromField f mdata >>= g

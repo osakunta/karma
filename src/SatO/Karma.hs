@@ -128,7 +128,9 @@ instance ToHtml IndexPage where
                 div_ [class_ "large-11 columns"] $ do
                     forM_ [minBound..maxBound] $ \e -> label_ $ do
                         input_ [type_ "radio", name_ "what", value_ $ actionEnumToText e]
-                        span_ $ toHtmlRaw $ actionEnumToHuman e
+                        span_ $ do
+                            toHtmlRaw $ actionEnumToHuman e
+                            maybe (pure ()) (small_ . toHtmlRaw . (" " <>)) $ actionEnumToHuman2 e
                     hr_ []
 
             -- Submit
@@ -150,15 +152,15 @@ instance ToHtml IndexPage where
 
 actionTableToHtml :: Monad m => ActionUrl -> TZ -> [Action] -> HtmlT m ()
 actionTableToHtml actionUrl tz as =
-        table_ [ id_ "actions-table" ] $ do
-            tr_ $ do
-                th_ "Kuka"
-                th_ "Mitä"
-                th_ "Koska"
-            forM_ (take 50 as) $ \(Action member enum stamp) -> tr_ $ do
-                td_ $ a_ [href_ $ actionUrl <> "chart/" <> member ] $ toHtml member
-                td_ $ toHtml $ actionEnumToHuman enum
-                td_ $ toHtml $ show $ utcToLocalTimeTZ tz stamp
+    table_ [ id_ "actions-table" ] $ do
+        tr_ $ do
+            th_ "Kuka"
+            th_ "Mitä"
+            th_ "Koska"
+        forM_ (take 50 as) $ \(Action member enum stamp) -> tr_ $ do
+            td_ $ a_ [href_ $ actionUrl <> "chart/" <> member ] $ toHtml member
+            td_ $ toHtml $ actionEnumToHuman enum
+            td_ $ toHtml $ show $ utcToLocalTimeTZ tz stamp
 
 -------------------------------------------------------------------------------
 -- Enspoints
