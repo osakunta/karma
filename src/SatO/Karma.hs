@@ -18,6 +18,7 @@ import Control.AutoUpdate     (defaultUpdateSettings, mkAutoUpdate,
                                updateAction, updateFreq)
 import Control.Monad          (forM_, void)
 import Control.Monad.IO.Class (MonadIO (..))
+import Data.Aeson             (ToJSON (..), object, (.=))
 import Data.FileEmbed         (embedStringFile)
 import Data.Function          (on)
 import Data.List              (nub, sortBy)
@@ -25,7 +26,9 @@ import Data.Maybe             (fromMaybe)
 import Data.Monoid            ((<>))
 import Data.Pool              (Pool, createPool, withResource)
 import Data.Text              (Text)
-import Data.Time              (UTCTime, getCurrentTime)
+import Data.Time              (UTCTime, defaultTimeLocale, diffUTCTime,
+                               formatTime, getCurrentTime)
+import Data.Time.Format.Human (humanReadableTimeI18N', HumanTimeLocale (..), defaultHumanTimeLocale)
 import Data.Time.Zones        (TZ, loadSystemTZ, utcToLocalTimeTZ)
 import Lucid
 import Network.Wai
@@ -62,6 +65,7 @@ type ActionUrl = Text
 data IndexPage = IndexPage
     { _indexPageActionUrl :: !ActionUrl
     , _indexPageTz        :: !TZ
+    , _indexPageNow       :: !UTCTime
     , _indexPageActions   :: ![Action]
     }
 
@@ -71,6 +75,14 @@ data Ctx = Ctx
     , _ctxTz           :: !TZ
     , _ctxAllGraph     :: !(IO Chart)
     }
+
+data ActionsResponse = ActionsResponse !ActionUrl !TZ !UTCTime ![Action]
+
+instance ToJSON ActionsResponse where
+    toJSON (ActionsResponse actionUrl tz now as) = object
+        [ "status" .= ("ok" :: Text)
+        , "data"   .= renderText (actionTableToHtml actionUrl tz now as)
+        ]
 
 data SVG
 
@@ -87,6 +99,8 @@ denv = unsafePerformIO $ defaultEnv vectorAlignmentFns 1000 700
 type KarmaAPI =
     Get '[HTML] IndexPage
     :<|> ReqBody '[FormUrlEncoded] InsertAction :> Post '[HTML] IndexPage
+    :<|> "ajax" :> ReqBody '[JSON] InsertAction :> Post '[JSON] ActionsResponse
+    :<|> "table" :> Get '[JSON] ActionsResponse
     :<|> "chart" :> Get '[SVG] Chart
     :<|> "chart" :> Capture "who" Text :> Get '[SVG] Chart
 
@@ -95,7 +109,7 @@ karmaApi = Proxy
 
 instance ToHtml IndexPage where
     toHtmlRaw _ = pure ()
-    toHtml (IndexPage actionUrl tz as) = page_ "SatO Karma" $ do
+    toHtml (IndexPage actionUrl tz now as) = page_ "SatO Karma" $ do
         div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $
             h1_ "SatO Karma"
 
@@ -118,7 +132,9 @@ instance ToHtml IndexPage where
                 div_ [class_ "large-11 columns"] $ do
                     forM_ [minBound..maxBound] $ \e -> label_ $ do
                         input_ [type_ "radio", name_ "what", value_ $ actionEnumToText e]
-                        span_ $ toHtmlRaw $ actionEnumToHuman e
+                        span_ $ do
+                            toHtmlRaw $ actionEnumToHuman e
+                            maybe (pure ()) (small_ . toHtmlRaw . (" " <>)) $ actionEnumToHuman2 e
                     hr_ []
 
             -- Submit
@@ -130,21 +146,51 @@ instance ToHtml IndexPage where
         hr_ []
 
         div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $ do
-            img_ [src_ $ actionUrl <> "chart" ]
+            img_ [id_ "graph-image", src_ $ actionUrl <> "chart" ]
             br_ []
             span_ $ small_ "Päivittyy noin minuutin välein"
 
         hr_ []
 
-        table_ $ do
-            tr_ $ do
-                th_ "Kuka"
-                th_ "Mitä"
-                th_ "Koska"
-            forM_ (take 50 as) $ \(Action member enum stamp) -> tr_ $ do
+        div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $
+            actionTableToHtml actionUrl tz now as
+
+actionTableToHtml :: Monad m => ActionUrl -> TZ -> UTCTime -> [Action] -> HtmlT m ()
+actionTableToHtml actionUrl tz now as =
+    table_ [ id_ "actions-table" ] $ do
+        tr_ $ do
+            th_ "Kuka"
+            th_ "Mitä"
+            th_ "Koska"
+        forM_ (take 50 as) $ \(Action member enum stamp) ->
+            tr_ [class_ $ actionEnumToText enum <> " " <> cls stamp ] $ do
                 td_ $ a_ [href_ $ actionUrl <> "chart/" <> member ] $ toHtml member
                 td_ $ toHtml $ actionEnumToHuman enum
-                td_ $ toHtml $ show $ utcToLocalTimeTZ tz stamp
+                td_ $ toHtml $ humanTime now tz stamp
+  where
+    cls stamp | d < 45 * 60       = "recent"
+              | d > 20 * 60 * 60  = "very-old"
+              | otherwise         = "old"
+      where d = now `diffUTCTime` stamp
+
+-------------------------------------------------------------------------------
+-- Human Finissh time
+-------------------------------------------------------------------------------
+
+humanTime :: UTCTime -> TZ -> UTCTime -> String
+humanTime now tz stamp
+    | d < 5 * 60 * 60   = humanReadableTimeI18N' loc now stamp
+    | otherwise         = formatTime defaultTimeLocale "%c" $ utcToLocalTimeTZ tz stamp
+  where
+    d   = now `diffUTCTime` stamp
+    loc = defaultHumanTimeLocale
+        { justNow = "juur äskö"
+        , secondsAgo = \_ i -> i <> " sekunttia sitte"
+        , oneMinuteAgo = \_ -> "minuutti sitte"
+        , minutesAgo = \_ i -> i <> " minuuttia sitte"
+        , oneHourAgo = \_ -> "tunti sitte"
+        , aboutHoursAgo = \_ i -> i <> " tuntia sitte"
+        }
 
 -------------------------------------------------------------------------------
 -- Enspoints
@@ -153,13 +199,26 @@ instance ToHtml IndexPage where
 indexPage :: Ctx -> IO IndexPage
 indexPage (Ctx pool actionUrl tz _) = withResource pool $ \conn -> do
     as <- Postgres.query_ conn "SELECT member, action, stamp FROM karma ORDER BY stamp DESC;"
-    pure $ IndexPage actionUrl tz as
+    now <- getCurrentTime
+    pure $ IndexPage actionUrl tz now as
+
+actionsResponse :: Ctx -> IO ActionsResponse
+actionsResponse (Ctx pool actionUrl tz _) = withResource pool $ \conn -> do
+    as <- Postgres.query_ conn "SELECT member, action, stamp FROM karma ORDER BY stamp DESC;"
+    now <- getCurrentTime
+    pure $ ActionsResponse actionUrl tz now as
 
 submitPage :: Ctx -> InsertAction -> IO IndexPage
 submitPage ctx@(Ctx pool _ _ _) ia = do
     withResource pool $ \conn ->
         void $ Postgres.execute conn "INSERT INTO karma (member, action) VALUES (?, ?)" ia
     indexPage ctx
+
+submitAjax :: Ctx -> InsertAction -> IO ActionsResponse
+submitAjax ctx@(Ctx pool _ _ _) ia = do
+    withResource pool $ \conn ->
+        void $ Postgres.execute conn "INSERT INTO karma (member, action) VALUES (?, ?)" ia
+    actionsResponse ctx
 
 allChartEndpoint :: Ctx -> IO Chart
 allChartEndpoint (Ctx _ _ _ action) = action
@@ -217,6 +276,8 @@ page_ t b = doctypehtml_ $ do
 server :: Ctx -> Server KarmaAPI
 server ctx = liftIO (indexPage ctx)
     :<|> liftIO . (submitPage ctx)
+    :<|> liftIO . (submitAjax ctx)
+    :<|> liftIO (actionsResponse ctx)
     :<|> liftIO (allChartEndpoint ctx)
     :<|> liftIO . (chartEndpoint ctx)
 

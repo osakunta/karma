@@ -4,3 +4,6 @@ input { font-size: 14pt; }
 
 .error input[type="text"] { border-color: #c00; }
 .error label { color: #c00;  }
+
+tr.brewed-coffee.recent { background-color: #f1fff1; }
+tr.brewed-coffee.old    { background-color: #fff1f1; }

@@ -1,4 +1,4 @@
--- This file has been generated from package.yaml by hpack version 0.12.0.
+-- This file has been generated from package.yaml by hpack version 0.13.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -30,7 +30,7 @@ library
   ghc-options: -Wall
   build-depends:
       base                  >=4.7   && <4.9
-    , aeson                 >=0.8   && <0.11
+    , aeson                 >=0.8   && <0.12
     , aeson-compat
     , auto-update
     , base-compat
@@ -49,6 +49,7 @@ library
     , containers
     , either
     , file-embed
+    , friendly-time
     , http-client
     , http-client-tls
     , http-media
