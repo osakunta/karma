@@ -140,7 +140,7 @@ instance ToHtml IndexPage where
         hr_ []
 
         div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $ do
-            img_ [src_ $ actionUrl <> "chart" ]
+            img_ [id_ "graph-image", src_ $ actionUrl <> "chart" ]
             br_ []
             span_ $ small_ "Päivittyy noin minuutin välein"
 

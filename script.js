@@ -40,3 +40,18 @@ Array.prototype.slice.call(document.querySelectorAll("button.magic-auto-fill"))
   };
   console.log(form, submit);
 })();
+
+(function () {
+    var graph = document.querySelector("#graph-image");
+    var graphSrc = graph.src;
+
+    function seconds(s) { return s * 1000; }
+    function updateGraph() {
+        console.info("Update graph");
+        graph.src = graphSrc + "?" + (new Date().getTime());
+    }
+
+    setTimeout(function () {
+        setInterval(updateGraph, seconds(10));
+    }, seconds(30));
+})();
