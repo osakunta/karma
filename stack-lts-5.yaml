@@ -1,10 +1,12 @@
-resolver: lts-5.9
+resolver: lts-5.15
 packages:
 - '.'
 extra-deps:
-- servant-0.5
-- servant-server-0.5
-- servant-lucid-0.5
+- aeson-0.11.2.0
+- aeson-compat-0.3.3.0
+- servant-0.7
+- servant-server-0.7
+- servant-lucid-0.7
 - Chart-1.6
 - Chart-diagrams-1.6
 - SVGFonts-1.5.0.0
