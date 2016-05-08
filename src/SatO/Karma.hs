@@ -73,10 +73,13 @@ data Ctx = Ctx
     , _ctxAllGraph     :: !(IO Chart)
     }
 
-data PostResponse = PostResponse
+data ActionsResponse = ActionsResponse !ActionUrl !TZ ![Action]
 
-instance ToJSON PostResponse where
-    toJSON _ = object [ "status" .= ("ok" :: Text) ]
+instance ToJSON ActionsResponse where
+    toJSON (ActionsResponse actionUrl tz as) = object
+        [ "status" .= ("ok" :: Text)
+        , "data"   .= renderText (actionTableToHtml actionUrl tz as)
+        ]
 
 data SVG
 
@@ -93,7 +96,7 @@ denv = unsafePerformIO $ defaultEnv vectorAlignmentFns 1000 700
 type KarmaAPI =
     Get '[HTML] IndexPage
     :<|> ReqBody '[FormUrlEncoded] InsertAction :> Post '[HTML] IndexPage
-    :<|> "ajax" :> ReqBody '[JSON] InsertAction :> Post '[JSON] PostResponse
+    :<|> "ajax" :> ReqBody '[JSON] InsertAction :> Post '[JSON] ActionsResponse
     :<|> "chart" :> Get '[SVG] Chart
     :<|> "chart" :> Capture "who" Text :> Get '[SVG] Chart
 
@@ -143,7 +146,11 @@ instance ToHtml IndexPage where
 
         hr_ []
 
-        table_ $ do
+        actionTableToHtml actionUrl tz as
+
+actionTableToHtml :: Monad m => ActionUrl -> TZ -> [Action] -> HtmlT m ()
+actionTableToHtml actionUrl tz as =
+        table_ [ id_ "actions-table" ] $ do
             tr_ $ do
                 th_ "Kuka"
                 th_ "Mitä"
@@ -162,17 +169,22 @@ indexPage (Ctx pool actionUrl tz _) = withResource pool $ \conn -> do
     as <- Postgres.query_ conn "SELECT member, action, stamp FROM karma ORDER BY stamp DESC;"
     pure $ IndexPage actionUrl tz as
 
+actionsResponse :: Ctx -> IO ActionsResponse
+actionsResponse (Ctx pool actionUrl tz _) = withResource pool $ \conn -> do
+    as <- Postgres.query_ conn "SELECT member, action, stamp FROM karma ORDER BY stamp DESC;"
+    pure $ ActionsResponse actionUrl tz as
+
 submitPage :: Ctx -> InsertAction -> IO IndexPage
 submitPage ctx@(Ctx pool _ _ _) ia = do
     withResource pool $ \conn ->
         void $ Postgres.execute conn "INSERT INTO karma (member, action) VALUES (?, ?)" ia
     indexPage ctx
 
-submitAjax :: Ctx -> InsertAction -> IO PostResponse
-submitAjax (Ctx pool _ _ _) ia = do
+submitAjax :: Ctx -> InsertAction -> IO ActionsResponse
+submitAjax ctx@(Ctx pool _ _ _) ia = do
     withResource pool $ \conn ->
         void $ Postgres.execute conn "INSERT INTO karma (member, action) VALUES (?, ?)" ia
-    pure PostResponse
+    actionsResponse ctx
 
 allChartEndpoint :: Ctx -> IO Chart
 allChartEndpoint (Ctx _ _ _ action) = action
