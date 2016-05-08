@@ -19,6 +19,7 @@ data ActionEnum
     = Coffee
     | DishwasherIn
     | DishwasherOut
+    | Kitchen
     | Dishes
     | TablesPori
     | TablesRauma
@@ -33,6 +34,7 @@ actionEnumToText :: ActionEnum -> Text
 actionEnumToText Coffee        = "brewed-coffee"
 actionEnumToText DishwasherIn  = "dishwasher-in"
 actionEnumToText DishwasherOut = "dishwasher-out"
+actionEnumToText Kitchen       = "kitchen"
 actionEnumToText Dishes        = "dishes"
 actionEnumToText TablesPori    = "tables-pori"
 actionEnumToText TablesRauma   = "tables-rauma"
@@ -41,6 +43,7 @@ actionEnumToHuman :: ActionEnum -> Text
 actionEnumToHuman Coffee        = "Keitti kahvit"
 actionEnumToHuman DishwasherIn  = "Täytti tiskikoneen"
 actionEnumToHuman DishwasherOut = "Tyhjensi tiskikoneen"
+actionEnumToHuman Kitchen       = "Siivosi keittiön"
 actionEnumToHuman Dishes        = "Tiskasi"
 actionEnumToHuman TablesPori    = "Siivosi porin pöydät"
 actionEnumToHuman TablesRauma   = "Siivosi rauman pöydät"
