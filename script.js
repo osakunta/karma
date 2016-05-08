@@ -47,8 +47,18 @@ Array.prototype.slice.call(document.querySelectorAll("button.magic-auto-fill"))
 
     function seconds(s) { return s * 1000; }
     function updateGraph() {
-        console.info("Update graph");
+        console.info("Update graph and table");
         graph.src = graphSrc + "?" + (new Date().getTime());
+
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("GET", document.location.toString() + "table" , true);
+        xhttp.send();
+        xhttp.onreadystatechange = function() {
+          if (xhttp.readyState == 4 && xhttp.status == 200) {
+            var json = JSON.parse(xhttp.responseText);
+            document.querySelector("#actions-table").outerHTML = json.data;
+          }
+        };
     }
 
     setTimeout(function () {

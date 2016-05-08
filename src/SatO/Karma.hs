@@ -26,7 +26,7 @@ import Data.Maybe             (fromMaybe)
 import Data.Monoid            ((<>))
 import Data.Pool              (Pool, createPool, withResource)
 import Data.Text              (Text)
-import Data.Time              (UTCTime, getCurrentTime)
+import Data.Time              (UTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Zones        (TZ, loadSystemTZ, utcToLocalTimeTZ)
 import Lucid
 import Network.Wai
@@ -63,6 +63,7 @@ type ActionUrl = Text
 data IndexPage = IndexPage
     { _indexPageActionUrl :: !ActionUrl
     , _indexPageTz        :: !TZ
+    , _indexPageNow       :: !UTCTime
     , _indexPageActions   :: ![Action]
     }
 
@@ -73,12 +74,12 @@ data Ctx = Ctx
     , _ctxAllGraph     :: !(IO Chart)
     }
 
-data ActionsResponse = ActionsResponse !ActionUrl !TZ ![Action]
+data ActionsResponse = ActionsResponse !ActionUrl !TZ !UTCTime ![Action]
 
 instance ToJSON ActionsResponse where
-    toJSON (ActionsResponse actionUrl tz as) = object
+    toJSON (ActionsResponse actionUrl tz now as) = object
         [ "status" .= ("ok" :: Text)
-        , "data"   .= renderText (actionTableToHtml actionUrl tz as)
+        , "data"   .= renderText (actionTableToHtml actionUrl tz now as)
         ]
 
 data SVG
@@ -97,6 +98,7 @@ type KarmaAPI =
     Get '[HTML] IndexPage
     :<|> ReqBody '[FormUrlEncoded] InsertAction :> Post '[HTML] IndexPage
     :<|> "ajax" :> ReqBody '[JSON] InsertAction :> Post '[JSON] ActionsResponse
+    :<|> "table" :> Get '[JSON] ActionsResponse
     :<|> "chart" :> Get '[SVG] Chart
     :<|> "chart" :> Capture "who" Text :> Get '[SVG] Chart
 
@@ -105,7 +107,7 @@ karmaApi = Proxy
 
 instance ToHtml IndexPage where
     toHtmlRaw _ = pure ()
-    toHtml (IndexPage actionUrl tz as) = page_ "SatO Karma" $ do
+    toHtml (IndexPage actionUrl tz now as) = page_ "SatO Karma" $ do
         div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $
             h1_ "SatO Karma"
 
@@ -148,19 +150,26 @@ instance ToHtml IndexPage where
 
         hr_ []
 
-        actionTableToHtml actionUrl tz as
+        div_ [class_ "row"] $ div_ [class_ "large-12 columns"] $
+            actionTableToHtml actionUrl tz now as
 
-actionTableToHtml :: Monad m => ActionUrl -> TZ -> [Action] -> HtmlT m ()
-actionTableToHtml actionUrl tz as =
+actionTableToHtml :: Monad m => ActionUrl -> TZ -> UTCTime -> [Action] -> HtmlT m ()
+actionTableToHtml actionUrl tz now as =
     table_ [ id_ "actions-table" ] $ do
         tr_ $ do
             th_ "Kuka"
             th_ "Mitä"
             th_ "Koska"
-        forM_ (take 50 as) $ \(Action member enum stamp) -> tr_ $ do
-            td_ $ a_ [href_ $ actionUrl <> "chart/" <> member ] $ toHtml member
-            td_ $ toHtml $ actionEnumToHuman enum
-            td_ $ toHtml $ show $ utcToLocalTimeTZ tz stamp
+        forM_ (take 50 as) $ \(Action member enum stamp) ->
+            tr_ [class_ $ actionEnumToText enum <> " " <> cls stamp ] $ do
+                td_ $ a_ [href_ $ actionUrl <> "chart/" <> member ] $ toHtml member
+                td_ $ toHtml $ actionEnumToHuman enum
+                td_ $ toHtml $ show $ utcToLocalTimeTZ tz stamp
+  where
+    cls stamp | d < 45 * 60       = "recent"
+              | d > 20 * 60 * 60  = "very-old"
+              | otherwise         = "old"
+      where d = now `diffUTCTime` stamp
 
 -------------------------------------------------------------------------------
 -- Enspoints
@@ -169,12 +178,14 @@ actionTableToHtml actionUrl tz as =
 indexPage :: Ctx -> IO IndexPage
 indexPage (Ctx pool actionUrl tz _) = withResource pool $ \conn -> do
     as <- Postgres.query_ conn "SELECT member, action, stamp FROM karma ORDER BY stamp DESC;"
-    pure $ IndexPage actionUrl tz as
+    now <- getCurrentTime
+    pure $ IndexPage actionUrl tz now as
 
 actionsResponse :: Ctx -> IO ActionsResponse
 actionsResponse (Ctx pool actionUrl tz _) = withResource pool $ \conn -> do
     as <- Postgres.query_ conn "SELECT member, action, stamp FROM karma ORDER BY stamp DESC;"
-    pure $ ActionsResponse actionUrl tz as
+    now <- getCurrentTime
+    pure $ ActionsResponse actionUrl tz now as
 
 submitPage :: Ctx -> InsertAction -> IO IndexPage
 submitPage ctx@(Ctx pool _ _ _) ia = do
@@ -245,6 +256,7 @@ server :: Ctx -> Server KarmaAPI
 server ctx = liftIO (indexPage ctx)
     :<|> liftIO . (submitPage ctx)
     :<|> liftIO . (submitAjax ctx)
+    :<|> liftIO (actionsResponse ctx)
     :<|> liftIO (allChartEndpoint ctx)
     :<|> liftIO . (chartEndpoint ctx)
 
