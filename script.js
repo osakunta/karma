@@ -14,13 +14,18 @@ Array.prototype.slice.call(document.querySelectorAll("button.magic-auto-fill"))
   var form = document.querySelector("form");
   var submit = form.querySelector("input[type=submit");
 
+  var baseurl = document.location.toString();
+  if (baseurl[baseurl.length - 1] !== "/") {
+    baseurl = baseurl + "/";
+  }
+
   submit.onclick = function (e) {
     var who = form["who"].value;
     var what = form["what"].value;
 
     if (what !== "") {
       var xhttp = new XMLHttpRequest();
-      xhttp.open("POST", document.location.toString() + "ajax" , true);
+      xhttp.open("POST", baseurl + "ajax" , true);
       xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
       xhttp.send(JSON.stringify({
         member: who,
@@ -38,10 +43,16 @@ Array.prototype.slice.call(document.querySelectorAll("button.magic-auto-fill"))
     e.preventDefault();
     return false;
   };
-  console.log(form, submit);
+
+  console.log(form, submit, baseurl);
 })();
 
 (function () {
+    var baseurl = document.location.toString();
+    if (baseurl[baseurl.length - 1] !== "/") {
+      baseurl = baseurl + "/";
+    }
+
     var graph = document.querySelector("#graph-image");
     var graphSrc = graph.src;
 
@@ -51,7 +62,7 @@ Array.prototype.slice.call(document.querySelectorAll("button.magic-auto-fill"))
         graph.src = graphSrc + "?" + (new Date().getTime());
 
         var xhttp = new XMLHttpRequest();
-        xhttp.open("GET", document.location.toString() + "table" , true);
+        xhttp.open("GET", baseurl + "table" , true);
         xhttp.send();
         xhttp.onreadystatechange = function() {
           if (xhttp.readyState == 4 && xhttp.status == 200) {
