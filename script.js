@@ -11,6 +11,8 @@ Array.prototype.slice.call(document.querySelectorAll("button.magic-auto-fill"))
   });
 
 (function () {
+  var lastclick = 0;
+
   var form = document.querySelector("form");
   var submit = form.querySelector("input[type=submit");
 
@@ -18,6 +20,22 @@ Array.prototype.slice.call(document.querySelectorAll("button.magic-auto-fill"))
   if (baseurl[baseurl.length - 1] !== "/") {
     baseurl = baseurl + "/";
   }
+
+  function updateSubmit() {
+    if (lastclick <= 0) {
+      submit.value = "Lähetä";
+      submit.disabled = form["what"].value === "";
+    } else if (lastclick > 0) {
+      submit.value = "Lähetä (" + lastclick + ")";
+      submit.disabled = true;
+    }
+  }
+
+  Array.prototype.slice.call(form["what"])
+    .forEach(function (element) {
+      console.log(element);
+      element.onchange = updateSubmit;
+    });
 
   submit.onclick = function (e) {
     var who = form["who"].value;
@@ -38,13 +56,22 @@ Array.prototype.slice.call(document.querySelectorAll("button.magic-auto-fill"))
           document.querySelector("#actions-table").outerHTML = json.data;
         }
       };
+
+      lastclick = 20;
+      updateSubmit();
     }
+
+    setInterval(function () {
+        lastclick -= 1;
+        updateSubmit();
+    }, 1000);
 
     e.preventDefault();
     return false;
   };
 
   console.log(form, submit, baseurl);
+  updateSubmit();
 })();
 
 (function () {
