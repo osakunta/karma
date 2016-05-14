@@ -14,29 +14,33 @@ module SatO.Karma (
     Action,
     ) where
 
-import Control.AutoUpdate     (defaultUpdateSettings, mkAutoUpdate,
-                               updateAction, updateFreq)
-import Control.Monad          (forM_, void)
-import Control.Monad.IO.Class (MonadIO (..))
-import Data.Aeson             (ToJSON (..), object, (.=))
-import Data.FileEmbed         (embedStringFile)
-import Data.Function          (on)
-import Data.List              (nub, sortBy)
-import Data.Maybe             (fromMaybe)
-import Data.Monoid            ((<>))
-import Data.Pool              (Pool, createPool, withResource)
-import Data.Text              (Text)
-import Data.Time              (UTCTime, defaultTimeLocale, diffUTCTime,
-                               formatTime, getCurrentTime)
-import Data.Time.Format.Human (humanReadableTimeI18N', HumanTimeLocale (..), defaultHumanTimeLocale)
-import Data.Time.Zones        (TZ, loadSystemTZ, utcToLocalTimeTZ)
+import Control.AutoUpdate        (defaultUpdateSettings, mkAutoUpdate,
+                                  updateAction, updateFreq)
+import Control.Exception         (SomeException)
+import Control.Monad             (forM_, void)
+import Control.Monad.IO.Class    (MonadIO (..))
+import Data.Aeson                (ToJSON (..), object, (.=))
+import Data.FileEmbed            (embedStringFile)
+import Data.Function             (on, (&))
+import Data.List                 (nub, sortBy)
+import Data.Maybe                (fromMaybe)
+import Data.Monoid               ((<>))
+import Data.Pool                 (Pool, createPool, withResource)
+import Data.String               (fromString)
+import Data.Text                 (Text)
+import Data.Time                 (UTCTime, defaultTimeLocale, diffUTCTime,
+                                  formatTime, getCurrentTime)
+import Data.Time.Format.Human    (HumanTimeLocale (..), defaultHumanTimeLocale,
+                                  humanReadableTimeI18N')
+import Data.Time.Zones           (TZ, loadSystemTZ, utcToLocalTimeTZ)
 import Lucid
+import Network.HTTP.Types.Status (status500)
 import Network.Wai
 import Servant
 import Servant.HTML.Lucid
-import System.Environment     (lookupEnv)
-import System.IO              (hPutStrLn, stderr)
-import Text.Read              (readMaybe)
+import System.Environment        (lookupEnv)
+import System.IO                 (hPutStrLn, stderr)
+import Text.Read                 (readMaybe)
 
 import Database.PostgreSQL.Simple.URL (parseDatabaseUrl)
 
@@ -307,3 +311,11 @@ defaultMain = do
     hPutStrLn stderr "Hello, karma is alive"
     hPutStrLn stderr "Starting web server"
     Warp.run port (app ctx)
+    let settings = Warp.defaultSettings
+          & Warp.setPort port
+          & Warp.setOnExceptionResponse onExceptionResponse
+    Warp.runSettings settings (app ctx)
+
+onExceptionResponse :: SomeException -> Response
+onExceptionResponse exc =
+    responseLBS status500 [] $ fromString $ "Exception: " ++  show exc
