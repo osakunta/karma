@@ -57,18 +57,24 @@ Array.prototype.slice.call(document.querySelectorAll("button.magic-auto-fill"))
         }
       };
 
+      Array.prototype.slice.call(form["what"])
+        .forEach(function (element) {
+          element.checked = false;
+        });
       lastclick = 20;
-      updateSubmit();
-    }
 
-    setInterval(function () {
-        lastclick -= 1;
-        updateSubmit();
-    }, 1000);
+      updateSubmit();
+
+    }
 
     e.preventDefault();
     return false;
   };
+
+  setInterval(function () {
+      lastclick -= 1;
+      updateSubmit();
+  }, 1000);
 
   console.log(form, submit, baseurl);
   updateSubmit();
