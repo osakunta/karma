@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module SatO.Karma.Graph (karmaGraph) where
 
+import Data.Bifunctor (second)
 import Control.Monad.Trans.State.Strict (State, get, put, runState)
 
 import Data.Time (NominalDiffTime, UTCTime, diffUTCTime)
@@ -44,7 +45,7 @@ part start interval =
         ts' =  toList ts
         sol  = concat $ toLists $ odeSolve model ini ts
         l    = last sol
-    in (zip ts' sol, l)
+    in (second (max 0) <$> zip ts' sol, l)
 
 model :: Double -> [Double] -> [Double]
 model _ = fmap (negate . decay)
@@ -57,3 +58,10 @@ decay y = d y - d 0
     k1 = 0.4
     k2 = 0.8
     i2 = 2 :: Int
+
+{-
+decay :: Double -> Double
+decay x = k * log (1 + max 0 x)
+  where
+    k = 0.3
+-}

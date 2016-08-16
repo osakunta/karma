@@ -1,5 +1,6 @@
 module SatO.Karma.Chart (Chart, chart) where
 
+import Data.Bifunctor (second)
 import Data.Map  (Map, foldWithKey)
 import Data.Text (Text, unpack)
 import Data.Colour.CIE
@@ -21,8 +22,8 @@ chart m = Chart $ do
     foldWithKey f (pure ()) m
   where
     f n (Graph curr prev next) p = do
-        plot (dline [next])
-        plot (line n' [prev'])
+        plot (dline [second (min maxValue) <$> next])
+        plot (line n' [second (min maxValue) <$> prev'])
         p
       where
         n' = unpack n ++ " " ++ show (round $ curr * 1000 :: Int)
@@ -32,6 +33,9 @@ chart m = Chart $ do
                 | t > mint   -> (mint, 0) : (t, 0) : t'
                 | otherwise -> t'
         mint = negate 60
+
+maxValue :: Double
+maxValue = 10
 
 dline :: [[(x,y)]]  -> EC l (PlotLines x y)
 dline values = liftEC $ do
