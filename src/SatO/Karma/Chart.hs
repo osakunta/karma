@@ -26,11 +26,12 @@ chart m = Chart $ do
         p
       where
         n' = unpack n ++ " " ++ show (round $ curr * 1000 :: Int)
-        prev' = case filter ((> (-30)) . fst) prev of
-            []         -> [(-30,0), (0, 0)]
-            ((t, _):_)
-                | t > -30   -> (-30, 0) : (t, 0) : prev
-                | otherwise -> prev
+        prev' = case filter ((> mint) . fst) prev of
+            []         -> [(mint, 0), (0, 0)]
+            t'@((t, _):_)
+                | t > mint   -> (mint, 0) : (t, 0) : t'
+                | otherwise -> t'
+        mint = negate 60
 
 dline :: [[(x,y)]]  -> EC l (PlotLines x y)
 dline values = liftEC $ do
