@@ -57,6 +57,7 @@ Array.prototype.slice.call(document.querySelectorAll("button.magic-auto-fill"))
         }
       };
 
+      form["who"].value = "";
       Array.prototype.slice.call(form["what"])
         .forEach(function (element) {
           element.checked = false;
